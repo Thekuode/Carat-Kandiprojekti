@@ -1,0 +1,6 @@
+#unit tests
+pytest
+#Parsing HTMl
+beautifulsoup4
+#HTTP requests
+requests
