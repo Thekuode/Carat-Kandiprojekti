@@ -1,0 +1,4 @@
+#Carat data files
+*.csv
+#Any output files
+*.json
