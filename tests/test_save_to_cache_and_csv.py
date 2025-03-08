@@ -21,7 +21,7 @@ def test_save_to_cache_and_csv():
     mock_last_updated = "Jan 1, 2025"
 
     # mock file opening and writing
-    save_to_cache_and_csv(mock_pkg, mock_rating, mock_reviews, mock_downloads, mock_last_updated)
+    save_to_cache_and_csv(mock_pkg, mock_rating, mock_reviews, mock_downloads, mock_last_updated, CACHE_FILE, OUTPUT_CSV_FILE)
 
     # make sure that write operations happen for the cache file
     with open(CACHE_FILE, "a", encoding="utf-8") as file:

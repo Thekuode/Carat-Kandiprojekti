@@ -13,7 +13,7 @@
 
 
 
-from unittest.mock import mock_open, patch
+from unittest.mock import mock_open, patch, ANY
 from play_store_fetcher2 import CACHE_FILE, OUTPUT_CSV_FILE
 
 @patch("builtins.open", mock_open())
@@ -29,7 +29,7 @@ def test_main(mock_save, mock_get_info, mock_request, mock_read):
     main()
 
     # check the save_to_cache_and_csv call
-    mock_save.assert_called_with("com.example.app", "4.5", "100K+", "1M+", "Last Updated: Jan 1, 2025")
+    mock_save.assert_called_with("com.example.app", "4.5", "100K+", "1M+", "Last Updated: Jan 1, 2025", ANY, ANY)
 
     # check the request URL
     mock_request.assert_called_once_with("https://play.google.com/store/apps/details?id=com.example.app")
