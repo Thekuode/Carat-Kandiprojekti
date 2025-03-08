@@ -12,48 +12,33 @@
 # The expected output for each test is compared with the actual output returned 
 # by the function and if they match, the test is considered successful.
 
-
 import pytest
 from play_store_fetcher2 import extract_app_info
 
-def test_extract_app_info():
-    text = "Rating: 4.5 stars, 100K+ reviews, 1M+ Downloads"
-    rating, reviews, downloads = extract_app_info(text)
-    assert rating == "4.5"
-    assert reviews == "100K+"
-    assert downloads == "1M+"
+#Test inputs as tuple[str, str, str, str]
+@pytest.mark.parametrize("raw_html, expected_rating, expected_reviews, expected_downloads", 
+    [
+        ("Rating: 4.5 stars, 100K+ reviews, 1M+ Downloads", "4.5", "100K+", "1M+"), #When all information is present
+        ("Rating: Not found, reviews: Not found, Downloads: Not found", "Not found", "Not found", "Not found"), #When all information is missing
+        ("Rating: , reviews, Downloads", "Not found", "Not found", "Not found"), #When some data is missing or not found
+        ("", "Not found", "Not found", "Not found"), #When the input text is empty
+        ("rating: 5.0 star, 1 reviews, 1 Downloads", "5.0", "1", "1"), #When edge cases are encountered (e.g., single values)
+        ("RATING: 3.3 STAR, 999 REVIEWS, 999 DOWNLOADS", "3.3", "999", "999"), #When the input text uses different capitalizations
+    ]
+)
+def test_extract_app_info(raw_html: str, expected_rating: str, expected_reviews: str, expected_downloads: str) -> None:
+    """
+        Limit tests `extract_app_info()` with various inputs.
 
-    # test with not found data
-    text = "Rating: Not found, reviews: Not found, Downloads: Not found"
-    rating, reviews, downloads = extract_app_info(text)
-    assert rating == "Not found"
-    assert reviews == "Not found"
-    assert downloads == "Not found"
+        Ensures that that the `extract_app_info()` is able to handle correctly various inputs.
 
-    # test with missing data
-    text = "Rating: , reviews, Downloads"
-    rating, reviews, downloads = extract_app_info(text)
-    assert rating == "Not found"
-    assert reviews == "Not found"
-    assert downloads == "Not found"
-
-    # test with missing information
-    text = ""
-    rating, reviews, downloads = extract_app_info(text)
-    assert rating == "Not found"
-    assert reviews == "Not found"
-    assert downloads == "Not found"
-
-    # test with edge cases
-    text = "rating: 5.0 star, 1 reviews, 1 Downloads"
-    rating, reviews, downloads = extract_app_info(text)
-    assert rating == "5.0"
-    assert reviews == "1"
-    assert downloads == "1"
-
-    # test with lowercase and uppercase characters
-    text = "RATING: 3.3 STAR, 999 REVIEWS, 999 DOWNLOADS"
-    rating, reviews, downloads = extract_app_info(text)
-    assert rating == "3.3"
-    assert reviews == "999"
-    assert downloads == "999"
+        Args:
+            raw_html (str): html containing the data.
+            expected_rating (str): Expected rating output from the `extract_app_info()` function.
+            expected_reviews (str): Expected reviews count output from the `extract_app_info()` function.
+            expected_downloads (str): Expected downloads count output from the `extract_app_info()` function.
+    """
+    rating, reviews, downloads = extract_app_info(raw_html)
+    assert rating == expected_rating
+    assert reviews == expected_reviews
+    assert downloads == expected_downloads

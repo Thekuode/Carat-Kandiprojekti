@@ -5,3 +5,5 @@
 *.txt
 #Dont add the data
 carat-data-top1k-users-2014-to-2018-08-25/*
+#dont add pycache
+*__pycache__*
