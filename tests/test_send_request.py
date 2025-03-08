@@ -11,12 +11,12 @@
 
 
 import pytest
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 from play_store_fetcher2 import send_request
 
 # simulate a successful response
 @pytest.fixture
-def mock_successful_request():
+def mock_successful_request() -> MagicMock:
     with patch('requests.get') as mock_get:
         mock_get.return_value.status_code = 200
         mock_get.return_value.text = "<html></html>"
@@ -24,17 +24,17 @@ def mock_successful_request():
 
 # simulate a 404 error response
 @pytest.fixture
-def mock_404_request():
+def mock_404_request() -> MagicMock:
     with patch('requests.get') as mock_get:
         mock_get.return_value.status_code = 404
         yield mock_get
 
-def test_send_request_success(mock_successful_request):
+def test_send_request_success(mock_successful_request) -> None:
     url = "https://play.google.com/store/apps/details?id=com.example.app"
     response = send_request(url)
     assert response.status_code == 200
 
-def test_send_request_404(mock_404_request):
+def test_send_request_404(mock_404_request) -> None:
     url = "https://play.google.com/store/apps/details?id=com.example.notapp"
     response = send_request(url)
     assert response is None

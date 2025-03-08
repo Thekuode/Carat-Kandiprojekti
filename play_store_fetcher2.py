@@ -167,7 +167,7 @@ def save_to_cache_and_csv(pkg: str, rating: str, reviews: str, downloads: str, l
         writer = csv.writer(file)
         writer.writerow([pkg, rating, reviews, downloads, last_updated])
 
-def main():
+def main() -> None:
     """
     Fetches google playstore data for given packages. Outputs the data as csv.
 

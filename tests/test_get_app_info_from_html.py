@@ -14,7 +14,7 @@
 import pytest
 from play_store_fetcher2 import get_app_info_from_html
 
-def test_get_app_info_from_html():
+def test_get_app_info_from_html() -> None:
     # test when all the requested information is present
     mock_html = '''
     <html>
@@ -28,7 +28,7 @@ def test_get_app_info_from_html():
     result = get_app_info_from_html("com.example.app", mock_html)
     assert result == expected
 
-def test_get_app_info_from_html_missing_info():
+def test_get_app_info_from_html_missing_info() -> None:
     # test when last updated info is missing
     mock_html = '''
     <html>
@@ -41,7 +41,7 @@ def test_get_app_info_from_html_missing_info():
     result = get_app_info_from_html("com.example.app", mock_html)
     assert result == expected
 
-def test_get_app_info_from_html_no_info():
+def test_get_app_info_from_html_no_info() -> None:
     # test when all info is missing
     mock_html = '''
     <html>
@@ -54,7 +54,7 @@ def test_get_app_info_from_html_no_info():
     result = get_app_info_from_html("com.example.app", mock_html)
     assert result == expected
 
-def test_get_app_info_from_html_incomplete_info():
+def test_get_app_info_from_html_incomplete_info() -> None:
     # test when rating info is missing
     mock_html = '''
     <html>
@@ -68,7 +68,7 @@ def test_get_app_info_from_html_incomplete_info():
     result = get_app_info_from_html("com.example.app", mock_html)
     assert result == expected
 
-def test_get_app_info_from_html_invalid_format():
+def test_get_app_info_from_html_invalid_format() -> None:
     # test when the HTML format is invalid or unexpected
     mock_html = '''
     <html>
@@ -81,7 +81,7 @@ def test_get_app_info_from_html_invalid_format():
     result = get_app_info_from_html("com.example.app", mock_html)
     assert result == expected
 
-def test_get_app_info_from_html_rating_only():
+def test_get_app_info_from_html_rating_only() -> None:
     # test when only rating is provided in the HTML
     mock_html = '''
     <html>

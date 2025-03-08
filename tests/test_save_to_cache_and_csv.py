@@ -13,7 +13,7 @@ from unittest.mock import mock_open, patch
 from play_store_fetcher2 import CACHE_FILE, OUTPUT_CSV_FILE, save_to_cache_and_csv
 
 @patch("builtins.open", mock_open())
-def test_save_to_cache_and_csv():
+def test_save_to_cache_and_csv() -> None:
     mock_pkg = "com.example.app"
     mock_rating = "4.5"
     mock_reviews = "100K+"
