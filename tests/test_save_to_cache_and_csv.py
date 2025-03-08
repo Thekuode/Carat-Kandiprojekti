@@ -10,7 +10,7 @@
 
 
 from unittest.mock import mock_open, patch
-from play_store_fetcher2 import CACHE_FILE, OUTPUT_CSV_FILE, save_to_cache_and_csv
+from play_store_fetcher import CACHE_FILE, OUTPUT_CSV_FILE, save_to_cache_and_csv
 
 @patch("builtins.open", mock_open())
 def test_save_to_cache_and_csv() -> None:

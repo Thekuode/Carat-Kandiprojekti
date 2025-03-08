@@ -10,7 +10,7 @@
 
 
 import pytest
-from play_store_fetcher2 import read_package_names
+from play_store_fetcher import read_package_names
 
 # example input and expected output
 @pytest.fixture

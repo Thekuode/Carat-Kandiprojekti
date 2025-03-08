@@ -12,7 +12,7 @@
 # by the function and if they match, the test is considered successful
 
 import pytest
-from play_store_fetcher2 import get_app_info_from_html
+from play_store_fetcher import get_app_info_from_html
 
 def test_get_app_info_from_html() -> None:
     # test when all the requested information is present

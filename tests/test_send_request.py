@@ -12,7 +12,7 @@
 
 import pytest
 from unittest.mock import patch, MagicMock
-from play_store_fetcher2 import send_request
+from play_store_fetcher import send_request
 
 # simulate a successful response
 @pytest.fixture

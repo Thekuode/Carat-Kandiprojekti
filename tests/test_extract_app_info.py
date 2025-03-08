@@ -13,7 +13,7 @@
 # by the function and if they match, the test is considered successful.
 
 import pytest
-from play_store_fetcher2 import extract_app_info
+from play_store_fetcher import extract_app_info
 
 #Test inputs as tuple[str, str, str, str]
 @pytest.mark.parametrize("raw_html, expected_rating, expected_reviews, expected_downloads", 
