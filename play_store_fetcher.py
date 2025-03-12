@@ -120,10 +120,10 @@ def get_app_info_from_html(raw_html: str) -> tuple[str, str, str, str]:
 
 def save_pkg_data(pkg: str, rating: str, reviews: str, downloads: str, last_updated: str, raw_html: str, cache_file: str, output_file: str, output_html_folder: str) -> None:
     """
-    Caches and outputs the given data for the given package.
+    Saves the given data for the given package.
 
     Cache data is stored as a generic file. Each line represents a unique package, data is ';' seperated in the file.   
-    Output is stored as a csv file. Data is ',' seperated.
+    Output is stored as a csv file. Data is ',' seperated. Raw html is stored as html.
 
     Args:
         pkg (str): Package name.
@@ -185,8 +185,6 @@ def init_checks(package_input_csv: str, output_csv_file: str, output_html_folder
     #All good
     return (True, "")
     
-
-
 def main() -> None:
     """
     Fetches google playstore data for given packages. Outputs the data as csv.
@@ -227,28 +225,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
