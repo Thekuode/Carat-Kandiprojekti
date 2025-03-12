@@ -73,50 +73,19 @@ def send_request(url: str) -> Union[requests.Response, None]:
         print(f"Failed with status {response.status_code}")
         return None
 
-def extract_app_info(raw_html: str) -> tuple[str,str,str]:
-    """
-    Extracts data points from the given HTML using regular expressions.
-
-    Helper function, see `get_app_info_from_html()`. 
-    This function uses regular expressions to extract the following data points:
-    - Ratings: The number of stars.
-    - Review count: The number of reviews left.
-    - Download count: The number of times the app was downloaded.   
-    If data point is not present in the html, 'Not found' is returned for it.
-
-    Args:
-        raw_html (str): The HTML content containing the extractable data.
-
-    Returns:
-        tuple[str, str, str]: A tuple containing the rating, review count, and download count as strings in that order.
-        If any of the data points are not found, they are represented by the string 'Not Found'.
-    """
-    raw_html = raw_html.replace(",", ".")
-    rating_match = re.search(r'(\d+(\.\d+)?)\s*star', raw_html, re.IGNORECASE)
-    reviews_match = re.search(r'(\d+[A-Za-z\+]*?)\s*review', raw_html, re.IGNORECASE)
-    downloads_match = re.search(r'(\d+[A-Za-z\+]*?)\s*download', raw_html, re.IGNORECASE)
-
-    rating = rating_match.group(1) if rating_match else "Not found"
-    reviews = reviews_match.group(1) if reviews_match else "Not found"
-    downloads = downloads_match.group(1) if downloads_match else "Not found"
-
-    return rating, reviews, downloads
-
-def get_app_info_from_html(pkg: str, raw_html: str) -> tuple[str, str, str, str]:
+def get_app_info_from_html(raw_html: str) -> tuple[str, str, str, str]:
     """
     Extracts data points from the given HTML.
 
     Parses html using BeautifulSoup. 
-    If present in html, using helper function (see `extract_app_info()`) extracts following data points:
+    If present in the html, extracts the following data points:
     - Ratings: The number of stars.
     - Review count: The number of reviews left.
-    - Download count: The number of times the app was downloaded.   
-    If present in the html, extracts the following data points:
+    - Download count: The number of times the app was downloaded.
     - Last update time: When was the last update released for the app.   
     If data point is not present in the html, 'Not found' is returned for it.
     
     Args:
-        pkg (str): Package name
         raw_html (str): HTML containing the data points
 
     Returns:
@@ -125,23 +94,29 @@ def get_app_info_from_html(pkg: str, raw_html: str) -> tuple[str, str, str, str]
     """
     soup = BeautifulSoup(raw_html, 'html.parser')
 
-    # extract rating, reviews and downloads
-    raw_info = soup.find("div", class_="l8YSdd")
-    if raw_info:
-        rating, reviews, downloads = extract_app_info(raw_info.text.strip())
-    else:
-        print(f"Info not found for {pkg}.")
-        rating, reviews, downloads = "Not found", "Not found", "Not found"
+    #CSS selector paths for data
+    scrape_css_paths = {
+        "star_rating": "div.l8YSdd div.w7Iutd div.wVqUob div.ClM7O div div.TT9eCd",
+        "download_count": "div.l8YSdd div.w7Iutd div:nth-last-of-type(2) div.ClM7O", #Select 2nd last always. Rating data not always available.
+        "review_count": "div.l8YSdd div.w7Iutd div.wVqUob div.g1rdde", #If rating data is not available, will match to download. Filter handles it.
+        "last_updated_time": "section.HcyOxe div.SfzRHd div.TKjAsc div div.xg1aie"
+    }
 
-    # extract time of last update
-    last_updated_info = soup.find("div", class_="xg1aie")
-    if last_updated_info:
-        last_updated_time = last_updated_info.text.strip()
-    else:
-        print(f"Update info not found for {pkg}.")
-        last_updated_time = "Not found"
+    #Matches floats, ints, quantity data with postfix K,M or B, datetimes
+    filter_regex = r'(\d+\.\d+(K|M|B)\+?|\d+(K|M|B)\+?|\d+\.\d+|\d+\b|\b[A-Za-z]{3} \d{1,2}, \d{4}\b)'
+    scaped_data = {k:"Not Found" for k,p in scrape_css_paths.items()}
+    #Try to find data for each defined css path
+    for data_key, css_path in scrape_css_paths.items():
+         html_element = soup.select_one(css_path)
+         if html_element:
+            #Filter all the non wanted elements
+            filtered_regex = re.findall(filter_regex, html_element.get_text(strip=True))
+            filtered_value =  ' '.join([fv[0] for fv in filtered_regex])
+            if filtered_value:
+                scaped_data[data_key] = filtered_value
 
-    return rating, reviews, downloads, last_updated_time
+    #This expects that we use python +3.7, dict order needs to be guaranteed
+    return tuple(scaped_data.values())
 
 def save_pkg_data(pkg: str, rating: str, reviews: str, downloads: str, last_updated: str, raw_html: str, cache_file: str, output_file: str, output_html_folder: str) -> None:
     """
@@ -238,7 +213,7 @@ def main() -> None:
 
             # if the request was successful
             if r:
-                rating, reviews, downloads, last_updated = get_app_info_from_html(pkg_name, r.text)
+                rating, reviews, downloads, last_updated = get_app_info_from_html(r.text)
                 save_pkg_data(pkg_name, rating, reviews, downloads, last_updated, r.text, CACHE_FILE, OUTPUT_CSV_FILE, OUTPUT_HTML_FOLDER)
             else:
                 print(f"Skipping {pkg_name} due to a failed request")
