@@ -18,10 +18,10 @@ def get_app_info_from_html(raw_html: str) -> tuple[str, str, str, str]:
     Extracts data points from the given HTML.
 
     Parses html using BeautifulSoup. 
-    If present in the html, extracts the following data points:
+    If present in the html, extracts the following data points and returns them in this order:
     - Ratings: The number of stars.
-    - Review count: The number of reviews left.
     - Download count: The number of times the app was downloaded.
+    - Review count: The number of reviews left.
     - Last update time: When was the last update released for the app.   
     If data point is not present in the html, 'Not found' is returned for it.
     
@@ -39,7 +39,7 @@ def get_app_info_from_html(raw_html: str) -> tuple[str, str, str, str]:
         "star_rating": "div.l8YSdd div.w7Iutd div.wVqUob div.ClM7O div div.TT9eCd",
         "download_count": "div.l8YSdd div.w7Iutd div:nth-last-of-type(2) div.ClM7O", #Select 2nd last always. Rating data not always available.
         "review_count": "div.l8YSdd div.w7Iutd div.wVqUob div.g1rdde", #If rating data is not available, will match to download. Filter handles it.
-        "last_updated_time": "section.HcyOxe div.SfzRHd div.TKjAsc div div.xg1aie"
+        "last_updated_time": "div.xg1aie"
     }
 
     #Matches floats, ints, quantity data with postfix K,M or B, datetimes
@@ -227,7 +227,7 @@ def fetch_playstore_data_from_regions(cache_file: str, cached_packages: dict[lis
         # if the request was successful
         if playstore_response.status_code == 200 or playstore_response.status_code == 404:
             print(f"Request sucess ({playstore_response.status_code}), saving data")
-            rating, reviews, downloads, last_updated = get_app_info_from_html(playstore_response.text)
+            rating, downloads, reviews, last_updated = get_app_info_from_html(playstore_response.text)
             save_pkg_data(package, region, playstore_response.status_code, rating, reviews, downloads, last_updated, playstore_response.text, OUTPUT_CSV_FILE, OUTPUT_HTML_FOLDER)
             add_package_to_cache(cache_file, cached_packages, package, region)
         elif playstore_response.status_code == 429:

@@ -19,7 +19,7 @@ from play_store_fetcher import CACHE_FILE, OUTPUT_CSV_FILE
 @patch("builtins.open", mock_open())
 @patch("play_store_fetcher.read_package_names", return_value=["com.example.app"])
 @patch("play_store_fetcher.send_request", return_value=type("Response", (object,), {"status_code": 200, "text": "mock"}))
-@patch("play_store_fetcher.get_app_info_from_html", return_value=("4.5", "100K+", "1M+", "Jan 1, 2025"))
+@patch("play_store_fetcher.get_app_info_from_html", return_value=("4.5", "1M+", "100K+", "Jan 1, 2025"))
 @patch("play_store_fetcher.save_pkg_data")
 def test_main(mock_save, mock_get_info, mock_request, mock_read) -> None:
     # mock the dynamic file path or file-reading logic
