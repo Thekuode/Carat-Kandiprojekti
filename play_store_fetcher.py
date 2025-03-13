@@ -200,11 +200,12 @@ def fetch_playstore_data_from_regions(cache_file: str, cached_packages: dict[lis
         None
     """
     for region in regions:
+        print(f"Collecting {package}/{region}: ", end="")
         #Already fetched?
         if package_is_cached(cached_packages, package, region):
+            print("Is cached, skipping")
             continue
-        
-        print(f"Collecting {package}/{region}: ", end="")
+
         playstore_url = form_playstore_url(package, "en", region)
         playstore_response = requests.get(playstore_url)
 
