@@ -37,4 +37,4 @@ def test_send_request_success(mock_successful_request) -> None:
 def test_send_request_404(mock_404_request) -> None:
     url = "https://play.google.com/store/apps/details?id=com.example.notapp"
     response = send_request(url)
-    assert response is None
+    assert response.status_code == 404

@@ -184,6 +184,21 @@ def read_package_names(file_path: str) -> list[str]:
                 package_names.append(parts[0])  # we get only the package name and not the type
     return package_names
 
+def send_request(url: str) -> requests.Response:
+    """
+    Makes a Get request to the given url. 
+
+    This function sends a GET request to the specified URL and returns the response 
+    object
+
+    Args:
+        url (str): Target for the get request.
+
+    Returns:
+        requests.Response: The response object
+    """
+    return requests.get(url)
+
 def fetch_playstore_data_from_regions(cache_file: str, cached_packages: dict[list[str]], package: str, regions: list[str]) -> None:
     """
     Fetches Play Store data for a given package in each specified region.
@@ -207,7 +222,7 @@ def fetch_playstore_data_from_regions(cache_file: str, cached_packages: dict[lis
             continue
 
         playstore_url = form_playstore_url(package, "en", region)
-        playstore_response = requests.get(playstore_url)
+        playstore_response = send_request(playstore_url)
 
         # if the request was successful
         if playstore_response.status_code == 200 or playstore_response.status_code == 404:
@@ -259,27 +274,29 @@ def init_checks(package_input_csv: str, output_csv_file: str, output_html_folder
     #All good
     return (True, "")
 
-def main() -> None:
+def main(input_file: str, regions: list[str]) -> None:
     """
     Fetches Google Play Store data for the given packages and outputs the data as a CSV file.
 
     This function reads package names from the specified CSV file, fetches data from the Google Play Store 
     for each package in each defined region, and caches the results. It then outputs the fetched data to a CSV file and stores the raw html.
 
+    Args:
+        input_file (str): File path containing the packages to fetch
+        regions (list[str]): Regions to fetch data from.
     Returns:
         None
     """
     #Check and create all folders and files for operation
-    init_successful, init_error_msg = init_checks(CSV_FILE_PATH, OUTPUT_CSV_FILE, OUTPUT_HTML_FOLDER)
+    init_successful, init_error_msg = init_checks(input_file, OUTPUT_CSV_FILE, OUTPUT_HTML_FOLDER)
     if init_successful:
         #Read package names and cache contents
-        package_names = read_package_names(CSV_FILE_PATH)
+        package_names = read_package_names(input_file)
         cached_packages = read_cached_packages(CACHE_FILE)
-        fetch_regions = ["US"]
         #Request google playstore pages
         for pkg_name in package_names:
             #Fetch data for the package in the regions
-            fetch_playstore_data_from_regions(CACHE_FILE, cached_packages, pkg_name, fetch_regions)
+            fetch_playstore_data_from_regions(CACHE_FILE, cached_packages, pkg_name, regions)
             # use a random delay between 2 and 4 seconds to avoid getting blocked
             delay = random.uniform(2, 4)
             time.sleep(delay)
@@ -288,4 +305,4 @@ def main() -> None:
         print(init_error_msg)
 
 if __name__ == "__main__":
-    main()
+    main(CSV_FILE_PATH, ["US"])
