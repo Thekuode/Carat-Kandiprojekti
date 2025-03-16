@@ -14,7 +14,6 @@
 
 
 from unittest.mock import mock_open, patch, ANY
-from play_store_fetcher import CACHE_FILE, OUTPUT_CSV_FILE
 
 @patch("builtins.open", mock_open())
 @patch("play_store_fetcher.read_package_names", return_value=["com.example.app"])
@@ -26,12 +25,10 @@ def test_main(mock_save, mock_get_info, mock_request, mock_read) -> None:
     mock_read.return_value = ["com.example.app"]
 
     from play_store_fetcher import main
-    main("./carat-data-top1k-users-2014-to-2018-08-25/allapps-with-categories-2018-12-15.csv", ["US"])
+    main("./carat-data-top1k-users-2014-to-2018-08-25/allapps-with-categories-2018-12-15.csv", ["US"], "")
 
-#pkg: str, data_region: str, http_status: int, rating: str, reviews: str, downloads: str, last_updated: str, raw_html: str, output_file: str, output_html_folder: str
     # check the save_pkg_data call
-                                #'com.example.app, US, 200, 4.5, 100K+, 1M+, Jan 1, 2025, mock'
-    mock_save.assert_called_with("com.example.app", "US", 200, "4.5", "100K+", "1M+", "Jan 1, 2025", "mock", ANY, ANY)
+    mock_save.assert_called_with("com.example.app", "US", "4.5", "100K+", "1M+", "Jan 1, 2025", "mock", ANY)
 
     # check the request URL
     mock_request.assert_called_once_with("https://play.google.com/store/apps/details?id=com.example.app&gl=US&hl=en")
