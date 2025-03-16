@@ -6,6 +6,7 @@ import requests
 from bs4 import BeautifulSoup
 import re
 import os
+import argparse
 import csv
 
 CACHE_FILE = "cached_files.txt"
@@ -304,5 +305,37 @@ def main(input_file: str, regions: list[str]) -> None:
         #Something went wrong, error msg before exit
         print(init_error_msg)
 
+def parse_console_arguments():
+    """
+    Parses command-line arguments for fetching data from the Google Play Store.
+
+    This function sets up the argument parser, processes the command-line arguments,
+    and returns the file path to the package listing and the regions to fetch data from.
+
+    Command-line arguments:
+        --package_listing (str): The file path to the file containing the listing of packages to fetch.
+        --regions (str): A comma-separated list of regions to fetch data from (e.g., US,FI,JA).
+                          Defaults to "US" if not provided.
+
+    Returns:
+        tuple: A tuple containing two elements:
+            - `package_listing` (str): The file path to the package listing.
+            - `regions` (list): A list of regions specified by the user, or ["US"] if no regions are provided.
+
+    Example usage:
+        python script.py --package_listing path/to/packages.txt --regions US,FI,JA
+
+    Notes:
+        - If the --regions argument is not specified, the default value "US" will be used.
+        - The --package_listing argument is required.
+    """
+    parser = argparse.ArgumentParser(description="This is a script that fetched data from google playstore for given packages and regions")
+    parser.add_argument('--package_listing', type=str, required=True, help="File path to the file containing the listing of packages to fetch")
+    parser.add_argument('--regions', type=lambda value: value.split(','), default="US", help="Listing of regions to fetch data from, ',' seperated list (ex: US,FI,JA). Defaults to US if none given")
+    args = parser.parse_args()
+    return args.package_listing, args.regions
+
 if __name__ == "__main__":
-    main(CSV_FILE_PATH, ["US"])
+    input_file, regions_list = parse_console_arguments()
+    if input_file and regions_list:
+        main(input_file, regions_list)
