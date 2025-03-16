@@ -26,6 +26,9 @@ def append_to_csv(output_path: str, data: Iterable[any]) -> None:
     Args:
         output_path (str): Path to the csv file.
         data (Iterable[any]): Data to output to the csv file.
+    
+    Returns:
+        None
     """
     with open(output_path, mode='a', newline='', encoding='utf-8') as file:
         writer = csv.writer(file, delimiter=";")
@@ -81,9 +84,10 @@ def save_pkg_data(pkg: str, data_region: str, rating: str, reviews: str, downloa
     Saves the package data, including metadata and raw HTML, to specified output files.
 
     This function stores the following information:
-    - Fetched data (name, region, http_status, rating, review, download_count, last_update_time) for package into the output csv file.
+    - Fetched data (name, region, rating, review, download_count, last_update_time) for package into the output csv file.
     - Raw html into the html file into the html output folder. Name is formed by combining f'{pkgname}_{region}.html'.
-
+    Output file prefix contained in variable `output_prefix` is considered when outputing data to files.
+    
     Args:
         pkg (str): The name of the package.
         data_region (str): The region from which the package data was fetched.
@@ -92,6 +96,7 @@ def save_pkg_data(pkg: str, data_region: str, rating: str, reviews: str, downloa
         downloads (str): The number of downloads for the package.
         last_updated (str): The last update timestamp for the package.
         raw_html (str): The raw HTML content for the package.
+        output_prefix (str): Output file name prefix.
 
     Returns:
         None
@@ -129,8 +134,10 @@ def read_cached_packages(output_prefix: str) -> set[str]:
     Reads the package names from the cache file that have cached data to avoid redundant requests.
 
     This function parses the cache file to extract the package names that already have cached data.
+    Output file prefix contained in `output_prefix` is considered when reading cache csv file. 
+
     Args:
-        cache_file (str): The file path to the cache file storing package names and their regions.
+        output_prefix (str): Output file name prefix.
 
     Returns:
         set[str]: A set of package names that have existing cached data.
@@ -149,9 +156,11 @@ def add_package_to_cache(output_prefix: str, cache: defaultdict[list[str]], pkg:
     Adds the package and its fetched region to the cache and appends it to the cache file.
 
     This function updates the cache dictionary by appending the region to the list of cached regions for 
-    the given package. It also appends the package and region to the specified cache file.
+    the given package. It also appends the package and region to the specified cache file. Prefix contained in
+    `output_prefix` is considered when outputing to the cache file.
 
     Args:
+        output_prefix (str): Prefix for the output files.
         cache (dict[list[str]]): A dictionary where package names are keys, and values are lists of regions.
         pkg (str): The name of the package to add to the cache.
         data_region (str): The region from which the data for the package was fetched.
@@ -162,17 +171,17 @@ def add_package_to_cache(output_prefix: str, cache: defaultdict[list[str]], pkg:
     cache[pkg].append(data_region)
     append_to_csv(f"{output_prefix}{CACHE_FILE}", [pkg, data_region])
 
-
-def package_is_cached(cache: dict[list[str]],package: str, data_region: str) -> bool:
+def package_is_cached(cache: defaultdict[list[str]], package: str, data_region: str) -> bool:
     """
     Checks if the package is cached for the specified region.
 
     This function checks if the given package has cached data for the specified region.
 
     Args:
-        cache (dict[list[str]]): A dictionary where keys are package names, and values are lists of regions where data is cached.
+        cache (defaultdict[list[str]]): A dictionary where keys are package names, and values are lists of regions where data is cached.
         package (str): The name of the package to check.
         data_region (str): The region (ISO 3166-1 alpha-2 country code) to check for the package.
+
     Returns:
         bool: True if the package is cached for the specified region, False otherwise.
     """
@@ -211,7 +220,7 @@ def send_request(url: str) -> requests.Response:
     """
     return requests.get(url)
 
-def fetch_playstore_data_from_regions(output_prefix: str, cached_packages: dict[list[str]], package: str, regions: list[str]) -> None:
+def fetch_playstore_data_from_regions(output_prefix: str, cached_packages: defaultdict[list[str]], package: str, regions: list[str]) -> None:
     """
     Fetches Play Store data for a given package in each specified region.
 
@@ -219,10 +228,11 @@ def fetch_playstore_data_from_regions(output_prefix: str, cached_packages: dict[
     It retrieves data for missing regions and updates both the cache and the cache file.
 
     Args:
-        cache_file (str): Path to the cache file where package data is stored.
+        output_prefix (str): Prefix of the output files.
         cached_packages (dict[list[str]]): A dictionary mapping package names to lists of regions where data has been fetched.
         package (str): The name of the package to fetch data for.
         regions (list[str]): A list of ISO 3166-1 alpha-2 country codes representing the regions to fetch data for.
+
     Returns:
         None
     """
@@ -246,6 +256,7 @@ def fetch_playstore_data_from_regions(output_prefix: str, cached_packages: dict[
             else:
                 print("Data not found")
                 append_to_csv(f"{output_prefix}{OUTPUT_MISSING_CSV_FILE}", [package, region, playstore_response.status_code, playstore_url])
+            #Cache the pkg for the region regardless of the HTTP status
             add_package_to_cache(output_prefix, cached_packages, package, region)
         else:
             print(f"Request failed ({playstore_response.status_code}) Noting failure down", end="")
@@ -261,11 +272,13 @@ def init_checks(package_input_csv: str, output_prefix: str) -> tuple[bool, str]:
 
     This function performs the following checks and actions:
         - Verifies if the input CSV file exists. Returns an error message if it doesn't.
-        - Checks if the output found CSV file exists. If it doesn't, creates it.
+        - Checks if the output CSV files exists. If it doesn't, creates it.
         - Checks if the raw HTML folder exists. If it doesn't, creates it.
-
+    Prefix contained in `output_prefix` is considered when checking for file existence.
+        
     Args:
         package_input_csv (str): Path to the input CSV file containing package names.
+        output_prefix (str): Prefix for the output file names.
 
     Returns:
         tuple[bool, str]: A tuple where the first element is a boolean indicating whether
@@ -303,10 +316,13 @@ def main(input_file: str, regions: list[str], output_prefix: str) -> None:
 
     This function reads package names from the specified CSV file, fetches data from the Google Play Store 
     for each package in each defined region, and caches the results. It then outputs the fetched data to a CSV file and stores the raw html.
+    Output file names are prefixed with the string contained in `output_prefix`.
 
     Args:
         input_file (str): File path containing the packages to fetch
         regions (list[str]): Regions to fetch data from.
+        output_prefix (str): Prefix for output files.
+
     Returns:
         None
     """
@@ -332,24 +348,29 @@ def parse_console_arguments() -> tuple[str,Iterable[str]]:
     Parses command-line arguments for fetching data from the Google Play Store.
 
     This function sets up the argument parser, processes the command-line arguments,
-    and returns the file path to the package listing and the regions to fetch data from.
+    and returns the file path to the package listing, the regions to fetch data from,
+    and an optional prefix for output file names.
 
     Command-line arguments:
-        --package_listing (str): The file path to the file containing the listing of packages to fetch.
+        --package_listing (str): The file path to the CSV file (';' delimiter expected) containing the listing of packages to fetch.
         --regions (str): A comma-separated list of regions to fetch data from (e.g., US,FI,JA).
-                          Defaults to "US" if not provided.
+                         Defaults to "US" if not provided.
+        --output_prefix (str): An optional prefix to key the output file names, enabling separate output files/folders.
+                               (e.g., "FIN" => "FIN_raw_html_output"). Defaults to an empty string if not provided.
 
     Returns:
-        tuple: A tuple containing two elements:
+        tuple: A tuple containing three elements:
             - `package_listing` (str): The file path to the package listing.
-            - `regions` (list): A list of regions specified by the user, or ["US"] if no regions are provided.
+            - `regions` (list[str]): A list of regions specified by the user, or ["US"] if no regions are provided.
+            - `output_prefix` (str): The optional prefix to be used in output file names, or an empty string if not provided.
 
     Example usage:
-        python script.py --package_listing path/to/packages.txt --regions US,FI,JA
+        python script.py --package_listing path/to/packages.csv --regions US,FI,JA --output_prefix FIN
 
     Notes:
         - If the --regions argument is not specified, the default value "US" will be used.
         - The --package_listing argument is required.
+        - The --output_prefix argument is optional. If not specified, it defaults to an empty string.
     """
     parser = argparse.ArgumentParser(description="This is a script that fetched data from google playstore for given packages and regions")
     parser.add_argument('--package_listing', type=str, required=True, help="File path to the file containing the listing of packages to fetch")
