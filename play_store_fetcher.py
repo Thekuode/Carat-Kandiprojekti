@@ -11,8 +11,9 @@ import argparse
 import csv
 
 CACHE_FILE = "cached_pkgs.csv"
-CSV_FILE_PATH = "./carat-data-top1k-users-2014-to-2018-08-25/allapps-with-categories-2018-12-15.csv"
-OUTPUT_CSV_FILE = "app_data.csv"
+OUTPUT_FOUND_CSV_FILE = "pkg_data_found.csv"
+OUTPUT_MISSING_CSV_FILE = "pkg_missing.csv"
+OUTPUT_ERROR_CSV_FILE = "pkg_error.csv"
 OUTPUT_HTML_FOLDER = "raw_html_output"
 
 def append_to_csv(output_path: str, data: Iterable[any]) -> None:
@@ -27,7 +28,7 @@ def append_to_csv(output_path: str, data: Iterable[any]) -> None:
         data (Iterable[any]): Data to output to the csv file.
     """
     with open(output_path, mode='a', newline='', encoding='utf-8') as file:
-        writer = csv.writer(file)
+        writer = csv.writer(file, delimiter=";")
         writer.writerow(data)
 
 def get_app_info_from_html(raw_html: str) -> tuple[str, str, str, str]:
@@ -75,7 +76,7 @@ def get_app_info_from_html(raw_html: str) -> tuple[str, str, str, str]:
     #This expects that we use python +3.7, dict order needs to be guaranteed
     return tuple(scaped_data.values())
 
-def save_pkg_data(pkg: str, data_region: str, http_status: int, rating: str, reviews: str, downloads: str, last_updated: str, raw_html: str, output_file: str, output_html_folder: str) -> None:
+def save_pkg_data(pkg: str, data_region: str, http_status: int, rating: str, reviews: str, downloads: str, last_updated: str, raw_html: str) -> None:
     """
     Saves the package data, including metadata and raw HTML, to specified output files.
 
@@ -92,17 +93,15 @@ def save_pkg_data(pkg: str, data_region: str, http_status: int, rating: str, rev
         downloads (str): The number of downloads for the package.
         last_updated (str): The last update timestamp for the package.
         raw_html (str): The raw HTML content for the package.
-        output_file (str): The file path for the output CSV file.
-        output_html_folder (str): The folder path to store the raw HTML files.
 
     Returns:
         None
     """
     # save to CSV file
-    append_to_csv(output_file, [pkg, data_region, http_status, rating, reviews, downloads, last_updated])
+    append_to_csv(OUTPUT_FOUND_CSV_FILE, [pkg, data_region, http_status, rating, reviews, downloads, last_updated])
 
     # save raw html for the package
-    raw_html_output_path = f"{output_html_folder}/{pkg}_{data_region}.html"
+    raw_html_output_path = f"{OUTPUT_HTML_FOLDER}/{pkg}_{data_region}.html"
     with open(raw_html_output_path, "w", encoding="utf-8") as file:
         file.write(raw_html)
 
@@ -126,7 +125,7 @@ def form_playstore_url(pkg: str, language:str, region: str) -> str:
         playstore_url = f"{playstore_url}&hl={language}"
     return playstore_url
 
-def read_cached_packages(cache_file: str) -> set[str]:
+def read_cached_packages() -> set[str]:
     """
     Reads the package names from the cache file that have cached data to avoid redundant requests.
 
@@ -138,15 +137,15 @@ def read_cached_packages(cache_file: str) -> set[str]:
         set[str]: A set of package names that have existing cached data.
     """
     package_cache = defaultdict(list)
-    if os.path.exists(cache_file):
-        with open(cache_file, newline='') as csv_file:
-            csv_reader = csv.reader(csv_file, delimiter=",")
+    if os.path.exists(CACHE_FILE):
+        with open(CACHE_FILE, newline='') as csv_file:
+            csv_reader = csv.reader(csv_file, delimiter=";")
             #pkg,region
             for line in csv_reader:
                 package_cache[line[0]].append(line[1])
     return package_cache
     
-def add_package_to_cache(cache_file: str, cache: defaultdict[list[str]], pkg: str, data_region:str) -> None:
+def add_package_to_cache(cache: defaultdict[list[str]], pkg: str, data_region:str) -> None:
     """
     Adds the package and its fetched region to the cache and appends it to the cache file.
 
@@ -154,7 +153,6 @@ def add_package_to_cache(cache_file: str, cache: defaultdict[list[str]], pkg: st
     the given package. It also appends the package and region to the specified cache file.
 
     Args:
-        cache_file (str): The location of the cache file where the package and region are stored.
         cache (dict[list[str]]): A dictionary where package names are keys, and values are lists of regions.
         pkg (str): The name of the package to add to the cache.
         data_region (str): The region from which the data for the package was fetched.
@@ -163,7 +161,7 @@ def add_package_to_cache(cache_file: str, cache: defaultdict[list[str]], pkg: st
         None
     """
     cache[pkg].append(data_region)
-    append_to_csv(cache_file, [pkg, data_region])
+    append_to_csv(CACHE_FILE, [pkg, data_region])
 
 
 def package_is_cached(cache: dict[list[str]],package: str, data_region: str) -> bool:
@@ -214,7 +212,7 @@ def send_request(url: str) -> requests.Response:
     """
     return requests.get(url)
 
-def fetch_playstore_data_from_regions(cache_file: str, cached_packages: dict[list[str]], package: str, regions: list[str]) -> None:
+def fetch_playstore_data_from_regions(cached_packages: dict[list[str]], package: str, regions: list[str]) -> None:
     """
     Fetches Play Store data for a given package in each specified region.
 
@@ -241,30 +239,34 @@ def fetch_playstore_data_from_regions(cache_file: str, cached_packages: dict[lis
 
         # if the request was successful
         if playstore_response.status_code == 200 or playstore_response.status_code == 404:
-            print(f"Request sucess ({playstore_response.status_code}), saving data")
-            rating, downloads, reviews, last_updated = get_app_info_from_html(playstore_response.text)
-            save_pkg_data(package, region, playstore_response.status_code, rating, reviews, downloads, last_updated, playstore_response.text, OUTPUT_CSV_FILE, OUTPUT_HTML_FOLDER)
-            add_package_to_cache(cache_file, cached_packages, package, region)
-        elif playstore_response.status_code == 429:
-            #Too many request, try again in a hour
-            print("Too many requests, stopping for an hour")
-            time.sleep(3600)
+            print(f"Request success ({playstore_response.status_code}) ", end="")
+            if playstore_response.status_code == 200:
+                print("Saving data")
+                rating, downloads, reviews, last_updated = get_app_info_from_html(playstore_response.text)
+                save_pkg_data(package, region, playstore_response.status_code, rating, reviews, downloads, last_updated, playstore_response.text)
+            else:
+                print("Data not found")
+                append_to_csv(OUTPUT_MISSING_CSV_FILE, [package, region, playstore_response.status_code])
+            add_package_to_cache(cached_packages, package, region)
         else:
-            print("Request failed")
-
-def init_checks(package_input_csv: str, output_csv_file: str, output_html_folder: str) -> tuple[bool, str]:
+            print(f"Request failed ({playstore_response.status_code}) Noting failure down", end="")
+            if playstore_response.status_code == 429:
+                #Too many request, try again in a hour
+                print("Too many requests, stopping for an hour")
+                time.sleep(3600)
+            append_to_csv(OUTPUT_ERROR_CSV_FILE, [package, region, playstore_response.status_code])
+            
+def init_checks(package_input_csv: str) -> tuple[bool, str]:
     """
     Checks and creates the expected folders and files needed for the process.
 
     This function performs the following checks and actions:
         - Verifies if the input CSV file exists. Returns an error message if it doesn't.
-        - Checks if the output CSV file exists. If it doesn't, creates it.
+        - Checks if the output found CSV file exists. If it doesn't, creates it.
         - Checks if the raw HTML folder exists. If it doesn't, creates it.
 
     Args:
         package_input_csv (str): Path to the input CSV file containing package names.
-        output_csv_file (str): Path to the output CSV file.
-        output_html_folder (str): Path to the folder for storing raw HTML files.
 
     Returns:
         tuple[bool, str]: A tuple where the first element is a boolean indicating whether
@@ -275,16 +277,22 @@ def init_checks(package_input_csv: str, output_csv_file: str, output_html_folder
     if not os.path.exists(package_input_csv):
         return (False, "Could not read input package file!")
     
+    output_csv_check = {
+        OUTPUT_FOUND_CSV_FILE: ['Package Name', 'Data Region', 'Http Status', 'Rating', 'Reviews', 'Downloads', 'Last Updated'],
+        OUTPUT_MISSING_CSV_FILE: ['Package Name', 'Data Region', 'Http Status'],
+        OUTPUT_ERROR_CSV_FILE: ['Package Name', 'Data Region', 'Http Status'],
+    }
     #Check if the ouput csv file exists, if not create it
-    if not os.path.exists(output_csv_file):
-        # create CSV header if the file is empty
-        with open(output_csv_file, mode='w', newline='', encoding='utf-8') as file:
-            writer = csv.writer(file)
-            writer.writerow(['Package Name', 'Data Region', 'Http Status', 'Rating', 'Reviews', 'Downloads', 'Last Updated'])
+    for path, header in output_csv_check.items():
+        if not os.path.exists(path):
+            # create CSV header if the file is empty
+            with open(path, mode='w', newline='', encoding='utf-8') as file:
+                writer = csv.writer(file)
+                writer.writerow(header)
 
     #Check that html output folder exists
-    if not os.path.exists(output_html_folder):
-        os.mkdir(output_html_folder)
+    if not os.path.exists(OUTPUT_HTML_FOLDER):
+        os.mkdir(OUTPUT_HTML_FOLDER)
     
     #All good
     return (True, "")
@@ -303,15 +311,15 @@ def main(input_file: str, regions: list[str]) -> None:
         None
     """
     #Check and create all folders and files for operation
-    init_successful, init_error_msg = init_checks(input_file, OUTPUT_CSV_FILE, OUTPUT_HTML_FOLDER)
+    init_successful, init_error_msg = init_checks(input_file)
     if init_successful:
         #Read package names and cache contents
         package_names = read_package_names(input_file)
-        cached_packages = read_cached_packages(CACHE_FILE)
+        cached_packages = read_cached_packages()
         #Request google playstore pages
         for pkg_name in package_names:
             #Fetch data for the package in the regions
-            fetch_playstore_data_from_regions(CACHE_FILE, cached_packages, pkg_name, regions)
+            fetch_playstore_data_from_regions(cached_packages, pkg_name, regions)
             # use a random delay between 2 and 4 seconds to avoid getting blocked
             delay = random.uniform(2, 4)
             time.sleep(delay)
