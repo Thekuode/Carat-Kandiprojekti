@@ -258,7 +258,7 @@ def fetch_playstore_data_from_regions(output_prefix: str, cached_packages: defau
             #Cache the pkg for the region regardless of the HTTP status
             add_package_to_cache(output_prefix, cached_packages, package, region)
         else:
-            print(f"Request failed ({playstore_response.status_code}) Noting failure down", end="")
+            print(f"Request failed ({playstore_response.status_code}) Noting failure down")
             if playstore_response.status_code == 429:
                 #Too many request, try again in a hour
                 print("Too many requests, stopping for an hour")
