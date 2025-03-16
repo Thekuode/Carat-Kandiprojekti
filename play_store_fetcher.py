@@ -1,14 +1,13 @@
-import random
 from collections.abc import Iterable
-from typing import Union
 from collections import defaultdict
-import time
-import requests
 from bs4 import BeautifulSoup
+import requests
+import argparse
+import random
+import time
+import csv
 import re
 import os
-import argparse
-import csv
 
 CACHE_FILE = "cached_pkgs.csv"
 OUTPUT_FOUND_CSV_FILE = "pkg_data_found.csv"
@@ -265,6 +264,10 @@ def fetch_playstore_data_from_regions(output_prefix: str, cached_packages: defau
                 print("Too many requests, stopping for an hour")
                 time.sleep(3600)
             append_to_csv(f"{output_prefix}{OUTPUT_ERROR_CSV_FILE}", [package, region, playstore_response.status_code, playstore_url])
+        
+        # use a random delay between 2 and 4 seconds to avoid getting blocked
+        delay = random.uniform(2, 4)
+        time.sleep(delay)
             
 def init_checks(package_input_csv: str, output_prefix: str) -> tuple[bool, str]:
     """
@@ -336,14 +339,11 @@ def main(input_file: str, regions: list[str], output_prefix: str) -> None:
         for pkg_name in package_names:
             #Fetch data for the package in the regions
             fetch_playstore_data_from_regions(output_prefix, cached_packages, pkg_name, regions)
-            # use a random delay between 2 and 4 seconds to avoid getting blocked
-            delay = random.uniform(2, 4)
-            time.sleep(delay)
     else:
         #Something went wrong, error msg before exit
         print(init_error_msg)
 
-def parse_console_arguments() -> tuple[str,Iterable[str]]:
+def parse_console_arguments() -> tuple[str,Iterable[str], str]:
     """
     Parses command-line arguments for fetching data from the Google Play Store.
 
