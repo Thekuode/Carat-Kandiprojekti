@@ -1,4 +1,5 @@
 import random
+from collections.abc import Iterable
 from typing import Union
 from collections import defaultdict
 import time
@@ -9,10 +10,25 @@ import os
 import argparse
 import csv
 
-CACHE_FILE = "cached_files.txt"
+CACHE_FILE = "cached_pkgs.csv"
 CSV_FILE_PATH = "./carat-data-top1k-users-2014-to-2018-08-25/allapps-with-categories-2018-12-15.csv"
 OUTPUT_CSV_FILE = "app_data.csv"
 OUTPUT_HTML_FOLDER = "raw_html_output"
+
+def append_to_csv(output_path: str, data: Iterable[any]) -> None:
+    """
+    Appends the given data to the given csv file.
+
+    If the given path does not exist, creates the csv file. Proceeds to append the given data to the
+    given csv file.
+
+    Args:
+        output_path (str): Path to the csv file.
+        data (Iterable[any]): Data to output to the csv file.
+    """
+    with open(output_path, mode='a', newline='', encoding='utf-8') as file:
+        writer = csv.writer(file)
+        writer.writerow(data)
 
 def get_app_info_from_html(raw_html: str) -> tuple[str, str, str, str]:
     """
@@ -83,9 +99,7 @@ def save_pkg_data(pkg: str, data_region: str, http_status: int, rating: str, rev
         None
     """
     # save to CSV file
-    with open(output_file, mode='a', newline='', encoding='utf-8') as file:
-        writer = csv.writer(file)
-        writer.writerow([pkg, data_region, http_status, rating, reviews, downloads, last_updated])
+    append_to_csv(output_file, [pkg, data_region, http_status, rating, reviews, downloads, last_updated])
 
     # save raw html for the package
     raw_html_output_path = f"{output_html_folder}/{pkg}_{data_region}.html"
@@ -126,13 +140,13 @@ def read_cached_packages(cache_file: str) -> set[str]:
     package_cache = defaultdict(list)
     if os.path.exists(cache_file):
         with open(cache_file, newline='') as csv_file:
-            csv_reader = csv.reader(csv_file, delimiter=";")
-            #pkg;region
+            csv_reader = csv.reader(csv_file, delimiter=",")
+            #pkg,region
             for line in csv_reader:
                 package_cache[line[0]].append(line[1])
     return package_cache
     
-def add_package_to_cache(cache_file: str, cache: dict[list[str]], pkg: str, data_region:str) -> None:
+def add_package_to_cache(cache_file: str, cache: defaultdict[list[str]], pkg: str, data_region:str) -> None:
     """
     Adds the package and its fetched region to the cache and appends it to the cache file.
 
@@ -149,8 +163,8 @@ def add_package_to_cache(cache_file: str, cache: dict[list[str]], pkg: str, data
         None
     """
     cache[pkg].append(data_region)
-    with open(cache_file, "a", encoding="utf-8") as file:
-        file.write(f"{pkg};{data_region}\n")
+    append_to_csv(cache_file, [pkg, data_region])
+
 
 def package_is_cached(cache: dict[list[str]],package: str, data_region: str) -> bool:
     """
@@ -305,7 +319,7 @@ def main(input_file: str, regions: list[str]) -> None:
         #Something went wrong, error msg before exit
         print(init_error_msg)
 
-def parse_console_arguments():
+def parse_console_arguments() -> tuple[str,Iterable[str]]:
     """
     Parses command-line arguments for fetching data from the Google Play Store.
 
