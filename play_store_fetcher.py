@@ -1,3 +1,4 @@
+from requests.exceptions import RequestException
 from collections.abc import Iterable
 from collections import defaultdict
 from bs4 import BeautifulSoup
@@ -216,6 +217,9 @@ def send_request(url: str) -> requests.Response:
 
     Returns:
         requests.Response: The response object
+    
+    Raises:
+        RequestException: If the request fails for any reason, throws subexception of RequestException
     """
     return requests.get(url)
 
@@ -243,28 +247,34 @@ def fetch_playstore_data_from_regions(output_prefix: str, cached_packages: defau
             continue
 
         playstore_url = form_playstore_url(package, "en", region)
-        playstore_response = send_request(playstore_url)
 
-        # if the request was successful
-        if playstore_response.status_code == 200 or playstore_response.status_code == 404:
-            print(f"Request success ({playstore_response.status_code}) ", end="")
-            if playstore_response.status_code == 200:
-                print("Saving data")
-                rating, downloads, reviews, last_updated = get_app_info_from_html(playstore_response.text)
-                save_pkg_data(package, region, rating, reviews, downloads, last_updated, playstore_response.text, output_prefix)
+        try:
+            #Request may throw exception for various reasons
+            playstore_response = send_request(playstore_url)
+
+            # if the request was successful
+            if playstore_response.status_code == 200 or playstore_response.status_code == 404:
+                print(f"Request success ({playstore_response.status_code}) ", end="")
+                if playstore_response.status_code == 200:
+                    print("Saving data")
+                    rating, downloads, reviews, last_updated = get_app_info_from_html(playstore_response.text)
+                    save_pkg_data(package, region, rating, reviews, downloads, last_updated, playstore_response.text, output_prefix)
+                else:
+                    print("Data not found")
+                    append_to_csv(f"{output_prefix}{OUTPUT_MISSING_CSV_FILE}", [package, region, playstore_response.status_code, playstore_url])
+                #Cache the pkg for the region regardless of the HTTP status
+                add_package_to_cache(output_prefix, cached_packages, package, region)
             else:
-                print("Data not found")
-                append_to_csv(f"{output_prefix}{OUTPUT_MISSING_CSV_FILE}", [package, region, playstore_response.status_code, playstore_url])
-            #Cache the pkg for the region regardless of the HTTP status
-            add_package_to_cache(output_prefix, cached_packages, package, region)
-        else:
-            print(f"Request failed ({playstore_response.status_code}) Noting failure down")
-            if playstore_response.status_code == 429:
-                #Too many request, try again in a hour
-                print("Too many requests, stopping for an hour")
-                time.sleep(3600)
-            append_to_csv(f"{output_prefix}{OUTPUT_ERROR_CSV_FILE}", [package, region, playstore_response.status_code, playstore_url])
-        
+                print(f"Server returned error ({playstore_response.status_code})")
+                if playstore_response.status_code == 429:
+                    #Too many request, try again in a hour
+                    print("Too many requests, stopping for an hour")
+                    time.sleep(3600)
+                append_to_csv(f"{output_prefix}{OUTPUT_ERROR_CSV_FILE}", [package, region, playstore_response.status_code, playstore_url, ""])
+        except RequestException as e:
+            print(f"Request failed: {e}")
+            append_to_csv(f"{output_prefix}{OUTPUT_ERROR_CSV_FILE}", [package, region, -1, playstore_url, repr(e)])
+
         # use a random delay between 2 and 4 seconds to avoid getting blocked
         delay = random.uniform(2, 4)
         time.sleep(delay)
@@ -300,7 +310,7 @@ def init_checks(package_input_csv: str, output_prefix: str) -> tuple[bool, str]:
         
         f"{output_prefix}{OUTPUT_FOUND_CSV_FILE}": ['Package Name', 'Data Region', 'Rating', 'Reviews', 'Downloads', 'Last Updated'],
         f"{output_prefix}{OUTPUT_MISSING_CSV_FILE}": ['Package Name', 'Data Region', 'Http Status', 'Url'],
-        f"{output_prefix}{OUTPUT_ERROR_CSV_FILE}": ['Package Name', 'Data Region', 'Http Status', 'Url'],
+        f"{output_prefix}{OUTPUT_ERROR_CSV_FILE}": ['Package Name', 'Data Region', 'Http Status', 'Url', 'Exception Message'],
     }
     #Check if the ouput csv file exists, if not create it
     for path, header in output_csv_check.items():
