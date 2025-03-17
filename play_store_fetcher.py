@@ -201,7 +201,7 @@ def read_package_names(file_path: str) -> list[str]:
         for line in f:
             parts = line.strip().split(";")
             if parts:
-                package_names.append(parts[0])  # we get only the package name and not the type
+                package_names.append(parts[0].split(":")[0])  # we get only the package name and filter any process postfixes
     return package_names
 
 def send_request(url: str) -> requests.Response:
