@@ -57,8 +57,8 @@ def get_app_info_from_html(raw_html: str) -> tuple[str, str, str, str]:
     #CSS selector paths for data
     scrape_css_paths = {
         "star_rating": "div.l8YSdd div.w7Iutd div.wVqUob div.ClM7O div div.TT9eCd",
-        "download_count": "div.l8YSdd div.w7Iutd div:nth-last-of-type(2) div.ClM7O", #Select 2nd last always. Rating data not always available.
-        "review_count": "div.l8YSdd div.w7Iutd div.wVqUob div.g1rdde", #If rating data is not available, will match to download. Filter handles it.
+        "download_count": "div.l8YSdd div.w7Iutd div div.ClM7O:not(:has(> img)):not(:has(> div)):not(:has(> span))", #Tricky to select
+        "review_count": "div.l8YSdd div.w7Iutd div.wVqUob div.g1rdde", #If rating data is not available, will match to "downloads" text. Filter handles it.
         "last_updated_time": "div.xg1aie"
     }
 
@@ -292,6 +292,10 @@ def init_checks(package_input_csv: str, output_prefix: str) -> tuple[bool, str]:
     if not os.path.exists(package_input_csv):
         return (False, "Could not find the input package listing file!")
     
+    #Check that html output folder exists. Also creates any possible prefix folders
+    if not os.path.exists(f"{output_prefix}{OUTPUT_HTML_FOLDER}"):
+        os.makedirs(f"{output_prefix}{OUTPUT_HTML_FOLDER}", exist_ok=True)
+
     output_csv_check = {
         
         f"{output_prefix}{OUTPUT_FOUND_CSV_FILE}": ['Package Name', 'Data Region', 'Rating', 'Reviews', 'Downloads', 'Last Updated'],
@@ -306,9 +310,7 @@ def init_checks(package_input_csv: str, output_prefix: str) -> tuple[bool, str]:
                 writer = csv.writer(file, delimiter=";")
                 writer.writerow(header)
 
-    #Check that html output folder exists
-    if not os.path.exists(f"{output_prefix}{OUTPUT_HTML_FOLDER}"):
-        os.mkdir(f"{output_prefix}{OUTPUT_HTML_FOLDER}")
+
     
     #All good
     return (True, "")
