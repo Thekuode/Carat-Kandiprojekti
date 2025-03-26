@@ -56,25 +56,30 @@ def get_app_info_from_html(raw_html: str) -> tuple[str, str, str, str]:
     soup = BeautifulSoup(raw_html, 'html.parser')
 
     #CSS selector paths for data
-    scrape_css_paths = {
-        "star_rating": "div.l8YSdd div.w7Iutd div.wVqUob div.ClM7O div div.TT9eCd",
-        "download_count": "div.l8YSdd div.w7Iutd div div.ClM7O:not(:has(> img)):not(:has(> div)):not(:has(> span))", #Tricky to select
-        "review_count": "div.l8YSdd div.w7Iutd div.wVqUob div.g1rdde", #If rating data is not available, will match to "downloads" text. Filter handles it.
-        "last_updated_time": "div.xg1aie"
+    scrape_css_data = {
+        "star_rating": {"css_selector" : "div.l8YSdd div.w7Iutd div.wVqUob div.ClM7O div div.TT9eCd", "filter": r"(?:[^\w\d]*)(\d+\.\d+|\d+)(?=[A-Za-z]+)", "filter_join": False},
+        "download_count": {"css_selector" : "div.l8YSdd div.w7Iutd div div.ClM7O:not(:has(> img)):not(:has(> div)):not(:has(> span))", "filter": r"(\d+(\.\d+)?[KMB]?\+?)", "filter_join": False}, #Tricky to select
+        "review_count": {"css_selector" : "div.l8YSdd div.w7Iutd div.wVqUob div.g1rdde", "filter": r"(\d+(\.\d+)?[KMB]?\+?)", "filter_join": False}, #If rating data is not available, will match to "downloads" text. Filter handles it.
+        "last_updated_time": {"css_selector" : "div.xg1aie", "filter": r"(?:Last\sUpdated:\s)?([A-Za-z]{3})\s(\d{1,2},)\s(\d{4})", "filter_join": True},
     }
 
-    #Matches floats, ints, quantity data with postfix K,M or B, datetimes
-    filter_regex = r'(\d+\.\d+(K|M|B)\+?|\d+(K|M|B)\+?|\d+\.\d+|\d+\b|\b[A-Za-z]{3} \d{1,2}, \d{4}\b)'
-    scaped_data = {k:"Not Found" for k,p in scrape_css_paths.items()}
+    scaped_data = {k:"Not Found" for k,p in scrape_css_data.items()}
     #Try to find data for each defined css path
-    for data_key, css_path in scrape_css_paths.items():
-         html_element = soup.select_one(css_path)
+    for data_key, scrape_data in scrape_css_data.items():
+         html_element = soup.select_one(scrape_data["css_selector"])
          if html_element:
             #Filter all the non wanted elements
-            filtered_regex = re.findall(filter_regex, html_element.get_text(strip=True))
-            filtered_value =  ' '.join([fv[0] for fv in filtered_regex])
-            if filtered_value:
-                scaped_data[data_key] = filtered_value
+            filtered_regex = re.findall(scrape_data["filter"], html_element.get_text(strip=True))
+            if filtered_regex:
+                filtered_value = filtered_regex[0]
+                #If filter needs to be joined
+                if scrape_data["filter_join"] and not isinstance(filtered_value, str):
+                    filtered_value = ' '.join([v for v in filtered_value if v])
+                #If not, select 0 index
+                elif not isinstance(filtered_value, str):
+                    filtered_value = filtered_value[0]
+                if filtered_value:
+                    scaped_data[data_key] = filtered_value
 
     #This expects that we use python +3.7, dict order needs to be guaranteed
     return tuple(scaped_data.values())
