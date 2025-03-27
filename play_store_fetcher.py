@@ -210,6 +210,19 @@ def read_package_names(file_path: str) -> list[str]:
                 package_names.append(parts[0].split(":")[0])  # we get only the package name and filter any process postfixes
     return package_names
 
+def get_cached_html_file(output_prefix, package, region):
+    html_path = f"{output_prefix}{OUTPUT_HTML_FOLDER}/{package}_{region}.html"
+    if os.path.exists(html_path):
+        raw_html = ""
+        with open(html_path, 'r', encoding='utf-8') as file:
+            raw_html = file.read()
+        #Spoof a Response object
+        response = requests.Response()
+        response.status_code = 200
+        response._content = raw_html.encode("utf-8")
+        return response
+    return None
+
 def send_request(url: str) -> requests.Response:
     """
     Makes a Get request to the given url. 
@@ -228,7 +241,7 @@ def send_request(url: str) -> requests.Response:
     """
     return requests.get(url)
 
-def fetch_playstore_data_from_regions(output_prefix: str, cached_packages: defaultdict[list[str]], package: str, regions: list[str]) -> None:
+def fetch_playstore_data_from_regions(output_prefix: str, cached_packages: defaultdict[list[str]], package: str, regions: list[str], use_cached_html: bool) -> None:
     """
     Fetches Play Store data for a given package in each specified region.
 
@@ -246,17 +259,27 @@ def fetch_playstore_data_from_regions(output_prefix: str, cached_packages: defau
     """
     for region in regions:
         print(f"Collecting {package}/{region}: ", end="")
-        #Already fetched?
-        if package_is_cached(cached_packages, package, region):
+        #Already fetched? are we rerunning data collection on cached files?
+        pkg_is_cached = package_is_cached(cached_packages, package, region)
+        if pkg_is_cached and not use_cached_html:
             print("Is cached, skipping")
             continue
 
         playstore_url = form_playstore_url(package, "en", region)
-
         try:
-            #Request may throw exception for various reasons
-            playstore_response = send_request(playstore_url)
+            playstore_response = None
 
+            #We are basicly rerunning data collection on cached files
+            if use_cached_html and pkg_is_cached:
+                playstore_response = get_cached_html_file(output_prefix, package, region)
+
+            #Not a rerun, or data was not available
+            if not use_cached_html or (not pkg_is_cached and use_cached_html) or not playstore_response:
+                #Set the sleep flag if we are here from failed cache fetch
+                pkg_is_cached = False
+                #Request may throw exception for various reasons
+                playstore_response = send_request(playstore_url)
+                
             # if the request was successful
             if playstore_response.status_code == 200 or playstore_response.status_code == 404:
                 print(f"Request success ({playstore_response.status_code}) ", end="")
@@ -268,7 +291,8 @@ def fetch_playstore_data_from_regions(output_prefix: str, cached_packages: defau
                     print("Data not found")
                     append_to_csv(f"{output_prefix}{OUTPUT_MISSING_CSV_FILE}", [package, region, playstore_response.status_code, playstore_url])
                 #Cache the pkg for the region regardless of the HTTP status
-                add_package_to_cache(output_prefix, cached_packages, package, region)
+                if not pkg_is_cached:
+                    add_package_to_cache(output_prefix, cached_packages, package, region)
             else:
                 print(f"Server returned error ({playstore_response.status_code})")
                 if playstore_response.status_code == 429:
@@ -281,8 +305,9 @@ def fetch_playstore_data_from_regions(output_prefix: str, cached_packages: defau
             append_to_csv(f"{output_prefix}{OUTPUT_ERROR_CSV_FILE}", [package, region, -1, playstore_url, repr(e)])
 
         # use a random delay between 2 and 4 seconds to avoid getting blocked
-        delay = random.uniform(2, 4)
-        time.sleep(delay)
+        if not pkg_is_cached:
+            delay = random.uniform(2, 4)
+            time.sleep(delay)
             
 def init_checks(package_input_csv: str, output_prefix: str) -> tuple[bool, str]:
     """
@@ -330,19 +355,20 @@ def init_checks(package_input_csv: str, output_prefix: str) -> tuple[bool, str]:
     #All good
     return (True, "")
 
-def main(input_file: str, regions: list[str], output_prefix: str) -> None:
+def main(input_file: str, regions: list[str], output_prefix: str, use_cached_html: bool) -> None:
     """
     Fetches Google Play Store data for the given packages and outputs the data as a CSV file.
 
     This function reads package names from the specified CSV file, fetches data from the Google Play Store 
     for each package in each defined region, and caches the results. It then outputs the fetched data to a CSV file and stores the raw html.
-    Output file names are prefixed with the string contained in `output_prefix`.
+    Output file names are prefixed with the string contained in `output_prefix`. If the use_cached_html flag is set, cached html files will be
+    used instead of fetching data from playstore.
 
     Args:
         input_file (str): File path containing the packages to fetch
         regions (list[str]): Regions to fetch data from.
         output_prefix (str): Prefix for output files.
-
+        use_cached_html (bool): Use cached html files.
     Returns:
         None
     """
@@ -355,18 +381,19 @@ def main(input_file: str, regions: list[str], output_prefix: str) -> None:
         #Request google playstore pages
         for pkg_name in package_names:
             #Fetch data for the package in the regions
-            fetch_playstore_data_from_regions(output_prefix, cached_packages, pkg_name, regions)
+            fetch_playstore_data_from_regions(output_prefix, cached_packages, pkg_name, regions, use_cached_html)
     else:
         #Something went wrong, error msg before exit
         print(init_error_msg)
 
-def parse_console_arguments() -> tuple[str,Iterable[str], str]:
+def parse_console_arguments() -> tuple[str,Iterable[str], str, bool]:
     """
     Parses command-line arguments for fetching data from the Google Play Store.
 
     This function sets up the argument parser, processes the command-line arguments,
     and returns the file path to the package listing, the regions to fetch data from,
-    and an optional prefix for output file names.
+    an optional prefix for output file names, and a flag indicating if the cached html files
+    should be used instead of fetching data from playstore.
 
     Command-line arguments:
         --package_listing (str): The file path to the CSV file (';' delimiter expected) containing the listing of packages to fetch.
@@ -374,28 +401,33 @@ def parse_console_arguments() -> tuple[str,Iterable[str], str]:
                          Defaults to "US" if not provided.
         --output_prefix (str): An optional prefix to key the output file names, enabling separate output files/folders.
                                (e.g., "FIN" => "FIN_raw_html_output"). Defaults to an empty string if not provided.
+        --use_cached_html (bool): An optional option to use the cached html files rather than fetching html files from the
+                               playstore. Defaults to False.
 
     Returns:
-        tuple: A tuple containing three elements:
+        tuple: A tuple containing four elements:
             - `package_listing` (str): The file path to the package listing.
             - `regions` (list[str]): A list of regions specified by the user, or ["US"] if no regions are provided.
             - `output_prefix` (str): The optional prefix to be used in output file names, or an empty string if not provided.
+            - `use_cached_html` (bool): The optional option to use cached html files rather than fetching data from playstore.
 
     Example usage:
-        python script.py --package_listing path/to/packages.csv --regions US,FI,JA --output_prefix FIN
+        python script.py --package_listing path/to/packages.csv --regions US,FI,JA --output_prefix FIN --use_cached_html False
 
     Notes:
         - If the --regions argument is not specified, the default value "US" will be used.
         - The --package_listing argument is required.
         - The --output_prefix argument is optional. If not specified, it defaults to an empty string.
+        - The --use_cached_html argument is optional. If not specified, it defaults to False
     """
     parser = argparse.ArgumentParser(description="This is a script that fetched data from google playstore for given packages and regions")
     parser.add_argument('--package_listing', type=str, required=True, help="File path to the file containing the listing of packages to fetch")
     parser.add_argument('--regions', type=lambda value: value.split(','), default="US", help="Listing of regions to fetch data from, ',' seperated list (e.g.: US,FI,JA). Defaults to US if none given")
     parser.add_argument('--output_prefix', default="", help="Optional input to prefix the output file names of the program, enabling seperate output files/folders. (e.g. FIN => FIN_raw_html_output). Defaults to nothing.")
+    parser.add_argument('--use_cached_html', type=bool, default=False, help="Optional input to avoid fetching data from playstore. Instead use the existing cached html files.")
     args = parser.parse_args()
-    return args.package_listing, args.regions, args.output_prefix
+    return args.package_listing, args.regions, args.output_prefix, args.use_cached_html
 
 if __name__ == "__main__":
-    input_file, regions_list, output_prefix = parse_console_arguments()
-    main(input_file, regions_list, output_prefix)
+    input_file, regions_list, output_prefix, use_cached_html = parse_console_arguments()
+    main(input_file, regions_list, output_prefix, use_cached_html)
