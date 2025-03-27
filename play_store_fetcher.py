@@ -3,6 +3,7 @@ from collections.abc import Iterable
 from collections import defaultdict
 from bs4 import BeautifulSoup
 from dateutil import parser
+from typing import Union
 import requests
 import argparse
 import random
@@ -161,7 +162,7 @@ def read_cached_packages(output_prefix: str) -> set[str]:
     if os.path.exists(f"{output_prefix}{CACHE_FILE}"):
         with open(f"{output_prefix}{CACHE_FILE}", newline='') as csv_file:
             csv_reader = csv.reader(csv_file, delimiter=";")
-            #pkg,region
+            #pkg;region
             for line in csv_reader:
                 package_cache[line[0]].append(line[1])
     return package_cache
@@ -220,7 +221,24 @@ def read_package_names(file_path: str) -> list[str]:
                 package_names.append(parts[0].split(":")[0])  # we get only the package name and filter any process postfixes
     return package_names
 
-def get_cached_html_file(output_prefix, package, region):
+def get_cached_html_file(output_prefix :str, package: str, region: str) -> Union[None, requests.Response]:
+    """
+    Retrieves the cached HTML content for a specific package and region.
+
+    This function checks if the cached HTML file for a given package and region exists. 
+    If the file is found, it reads the content and returns a spoofed `requests.Response` object 
+    with a status code of 200 and the HTML content as the response body. If the file does not 
+    exist, it returns `None`.
+
+    Args:
+        output_prefix (str): The prefix for the output directory where cached HTML files are stored.
+        package (str): The package name for which to retrieve the cached HTML file.
+        region (str): The region associated with the cached HTML file.
+
+    Returns:
+        requests.Response: A `requests.Response` object containing the cached HTML content if the file exists,
+        or `None` if the file is not found.
+    """
     html_path = f"{output_prefix}{OUTPUT_HTML_FOLDER}/{package}_{region}.html"
     if os.path.exists(html_path):
         raw_html = ""
@@ -263,6 +281,7 @@ def fetch_playstore_data_from_regions(output_prefix: str, cached_packages: defau
         cached_packages (dict[list[str]]): A dictionary mapping package names to lists of regions where data has been fetched.
         package (str): The name of the package to fetch data for.
         regions (list[str]): A list of ISO 3166-1 alpha-2 country codes representing the regions to fetch data for.
+        use_cached_html (bool): If flag is set, cached version of the html file will be used rather than fetching from playstore.
 
     Returns:
         None
@@ -360,8 +379,6 @@ def init_checks(package_input_csv: str, output_prefix: str) -> tuple[bool, str]:
                 writer = csv.writer(file, delimiter=";")
                 writer.writerow(header)
 
-
-    
     #All good
     return (True, "")
 
@@ -402,24 +419,24 @@ def parse_console_arguments() -> tuple[str,Iterable[str], str, bool]:
 
     This function sets up the argument parser, processes the command-line arguments,
     and returns the file path to the package listing, the regions to fetch data from,
-    an optional prefix for output file names, and a flag indicating if the cached html files
-    should be used instead of fetching data from playstore.
+    an optional prefix for output file names, and a flag indicating if cached HTML files
+    should be used instead of fetching data from the Play Store.
 
     Command-line arguments:
         --package_listing (str): The file path to the CSV file (';' delimiter expected) containing the listing of packages to fetch.
         --regions (str): A comma-separated list of regions to fetch data from (e.g., US,FI,JA).
                          Defaults to "US" if not provided.
-        --output_prefix (str): An optional prefix to key the output file names, enabling separate output files/folders.
+        --output_prefix (str): An optional prefix for output file names, enabling separate output files or folders.
                                (e.g., "FIN" => "FIN_raw_html_output"). Defaults to an empty string if not provided.
-        --use_cached_html (bool): An optional option to use the cached html files rather than fetching html files from the
-                               playstore. Defaults to False.
+        --use_cached_html (bool): An optional flag to use cached HTML files instead of fetching data from the Play Store.
+                                   Defaults to False. Helpful when reprocessing already fetched packages.
 
     Returns:
         tuple: A tuple containing four elements:
-            - `package_listing` (str): The file path to the package listing.
-            - `regions` (list[str]): A list of regions specified by the user, or ["US"] if no regions are provided.
-            - `output_prefix` (str): The optional prefix to be used in output file names, or an empty string if not provided.
-            - `use_cached_html` (bool): The optional option to use cached html files rather than fetching data from playstore.
+            - `package_listing` (str): The file path to the package listing CSV.
+            - `regions` (Iterable[str]): A list or other iterable of regions specified by the user, or ["US"] if no regions are provided.
+            - `output_prefix` (str): The optional prefix for output file names, or an empty string if not provided.
+            - `use_cached_html` (bool): Whether to use cached HTML files instead of fetching from the Play Store.
 
     Example usage:
         python script.py --package_listing path/to/packages.csv --regions US,FI,JA --output_prefix FIN --use_cached_html False
@@ -427,8 +444,8 @@ def parse_console_arguments() -> tuple[str,Iterable[str], str, bool]:
     Notes:
         - If the --regions argument is not specified, the default value "US" will be used.
         - The --package_listing argument is required.
-        - The --output_prefix argument is optional. If not specified, it defaults to an empty string.
-        - The --use_cached_html argument is optional. If not specified, it defaults to False
+        - The --output_prefix argument is optional and defaults to an empty string if not specified.
+        - The --use_cached_html argument is optional and defaults to False if not specified.
     """
     parser = argparse.ArgumentParser(description="This is a script that fetched data from google playstore for given packages and regions")
     parser.add_argument('--package_listing', type=str, required=True, help="File path to the file containing the listing of packages to fetch")
