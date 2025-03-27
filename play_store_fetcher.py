@@ -2,6 +2,7 @@ from requests.exceptions import RequestException
 from collections.abc import Iterable
 from collections import defaultdict
 from bs4 import BeautifulSoup
+from dateutil import parser
 import requests
 import argparse
 import random
@@ -57,12 +58,27 @@ def get_app_info_from_html(raw_html: str) -> tuple[str, str, str, str]:
 
     #CSS selector paths for data
     scrape_css_data = {
-        "star_rating": {"css_selector" : "div.l8YSdd div.w7Iutd div.wVqUob div.ClM7O div div.TT9eCd", "filter": r"(?:[^\w\d]*)(\d+\.\d+|\d+)(?=[A-Za-z]+)", "filter_join": False},
-        "download_count": {"css_selector" : "div.l8YSdd div.w7Iutd div div.ClM7O:not(:has(> img)):not(:has(> div)):not(:has(> span))", "filter": r"(\d+(\.\d+)?[KMB]?\+?)", "filter_join": False}, #Tricky to select
-        "review_count": {"css_selector" : "div.l8YSdd div.w7Iutd div.wVqUob div.g1rdde", "filter": r"(\d+(\.\d+)?[KMB]?\+?)", "filter_join": False}, #If rating data is not available, will match to "downloads" text. Filter handles it.
-        "last_updated_time": {"css_selector" : "div.xg1aie", "filter": r"(?:Last\sUpdated:\s)?([A-Za-z]{3})\s(\d{1,2},)\s(\d{4})", "filter_join": True},
+        "star_rating": {
+            "css_selector" : "div.l8YSdd div.w7Iutd div.wVqUob div.ClM7O div div.TT9eCd",
+            "filter": r"(?:[^\w\d]*)(\d+\.\d+|\d+)(?=[A-Za-z]+)", 
+            "value_func": lambda filter: filter[0] if isinstance(filter[0], str) else filter[0][0]
+        },
+        "download_count": {
+            "css_selector" : "div.l8YSdd div.w7Iutd div div.ClM7O:not(:has(> img)):not(:has(> div)):not(:has(> span))",
+            "filter": r"(\d+(\.\d+)?[KMB]?\+?)", 
+            "value_func": lambda filter: filter[0] if isinstance(filter[0], str) else filter[0][0]
+        }, #Tricky to select
+        "review_count": {
+            "css_selector" : "div.l8YSdd div.w7Iutd div.wVqUob div.g1rdde",
+            "filter": r"(\d+(\.\d+)?[KMB]?\+?)",
+            "value_func": lambda filter: filter[0] if isinstance(filter[0], str) else filter[0][0]
+        }, #If rating data is not available, will match to "downloads" text. Filter handles it.
+        "last_updated_time": {
+            "css_selector" : "div.xg1aie", 
+            "filter": r"\b(?:[A-Za-z]{3} \d{1,2},? \d{4}|\d{1,2} [A-Za-z]{3} \d{4}|\d{1,2} [A-Za-z]{3},? \d{4})\b",
+            "value_func": lambda filter: parser.parse(' '.join([v for v in filter if v])).strftime("%b %d, %Y")
+        },
     }
-
     scaped_data = {k:"Not Found" for k,p in scrape_css_data.items()}
     #Try to find data for each defined css path
     for data_key, scrape_data in scrape_css_data.items():
@@ -71,13 +87,7 @@ def get_app_info_from_html(raw_html: str) -> tuple[str, str, str, str]:
             #Filter all the non wanted elements
             filtered_regex = re.findall(scrape_data["filter"], html_element.get_text(strip=True))
             if filtered_regex:
-                filtered_value = filtered_regex[0]
-                #If filter needs to be joined
-                if scrape_data["filter_join"] and not isinstance(filtered_value, str):
-                    filtered_value = ' '.join([v for v in filtered_value if v])
-                #If not, select 0 index
-                elif not isinstance(filtered_value, str):
-                    filtered_value = filtered_value[0]
+                filtered_value = scrape_data["value_func"](filtered_regex)
                 if filtered_value:
                     scaped_data[data_key] = filtered_value
 
