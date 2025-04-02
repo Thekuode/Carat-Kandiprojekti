@@ -6,7 +6,6 @@ from dateutil import parser
 from typing import Union
 import requests
 import argparse
-import random
 import time
 import csv
 import re
@@ -120,7 +119,7 @@ def save_pkg_data(pkg: str, data_region: str, rating: str, reviews: str, downloa
     # save to CSV file
     append_to_csv(f"{output_prefix}{OUTPUT_FOUND_CSV_FILE}", [pkg, data_region, rating, reviews, downloads, last_updated])
 
-    # save raw html for the package
+    #save raw html for the package
     raw_html_output_path = f"{output_prefix}{OUTPUT_HTML_FOLDER}/{pkg}_{data_region}.html"
     with open(raw_html_output_path, "w", encoding="utf-8") as file:
         file.write(raw_html)
@@ -333,10 +332,6 @@ def fetch_playstore_data_from_regions(output_prefix: str, cached_packages: defau
             print(f"Request failed: {e}")
             append_to_csv(f"{output_prefix}{OUTPUT_ERROR_CSV_FILE}", [package, region, -1, playstore_url, repr(e)])
 
-        # use a random delay between 2 and 4 seconds to avoid getting blocked
-        if not pkg_is_cached:
-            delay = random.uniform(2, 4)
-            time.sleep(delay)
             
 def init_checks(package_input_csv: str, output_prefix: str) -> tuple[bool, str]:
     """
@@ -402,6 +397,8 @@ def main(input_file: str, regions: list[str], output_prefix: str, use_cached_htm
     #Check and create all folders and files for operation
     init_successful, init_error_msg = init_checks(input_file, output_prefix)
     if init_successful:
+        #start time
+        start_time = time.time()
         #Read package names and cache contents
         package_names = read_package_names(input_file)
         cached_packages = read_cached_packages(output_prefix)
@@ -409,6 +406,11 @@ def main(input_file: str, regions: list[str], output_prefix: str, use_cached_htm
         for pkg_name in package_names:
             #Fetch data for the package in the regions
             fetch_playstore_data_from_regions(output_prefix, cached_packages, pkg_name, regions, use_cached_html)
+        #ending time
+        end_time = time.time()
+        #calculating minutes how long code runs
+        elapsed_time = (end_time - start_time) / 60
+        print(f"Time taken: {elapsed_time:.2f} minutes")
     else:
         #Something went wrong, error msg before exit
         print(init_error_msg)
