@@ -54,7 +54,7 @@ def get_app_info_from_html(raw_html: str) -> tuple[str, str, str, str]:
         tuple[str, str, str, str]: A tuple containing the rating, review count, download count and last update time as strings in that order.
         If any of the data points are not found, they are represented by the string 'Not Found'.
     """
-    soup = BeautifulSoup(raw_html, 'html.parser')
+    soup = BeautifulSoup(raw_html, 'lxml')
 
     #CSS selector paths for data
     scrape_css_data = {
